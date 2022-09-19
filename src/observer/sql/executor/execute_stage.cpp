@@ -237,7 +237,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
         delete tmp_node;
       }
       end_trx_if_need(session, trx, false);
-      session_event->set_response("FAILURE");
+      session_event->set_response("FAILURE\n");
       return rc;
     }
     select_nodes.push_back(select_node);
@@ -254,7 +254,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     TupleSet tuple_set;
     rc = node->execute(tuple_set);
     if (rc != RC::SUCCESS) {
-      session_event->set_response("FAILURE");
+      session_event->set_response("FAILURE\n");
       for (SelectExeNode *&tmp_node : select_nodes) {
         delete tmp_node;
       }
