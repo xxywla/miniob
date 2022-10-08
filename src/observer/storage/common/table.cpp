@@ -390,8 +390,8 @@ RC Table::scan_record(
   return scan_record(trx, filter, limit, (void *)&adapter, scan_record_reader_adapter);
 }
 
-RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context,
-		      RC (*record_reader)(Record *record, void *context))
+RC Table::scan_record(
+    Trx *trx, ConditionFilter *filter, int limit, void *context, RC (*record_reader)(Record *record, void *context))
 {
   if (nullptr == record_reader) {
     return RC::INVALID_ARGUMENT;
@@ -765,36 +765,31 @@ IndexScanner *Table::find_index_for_scan(const DefaultConditionFilter &filter)
   bool left_inclusive = false;
   bool right_inclusive = false;
   switch (filter.comp_op()) {
-  case EQUAL_TO: {
-    left_key = (const char *)value_cond_desc->value;
-    right_key = (const char *)value_cond_desc->value;
-    left_inclusive = true;
-    right_inclusive = true;
-  }
-    break;
-  case LESS_EQUAL: {
-    right_key = (const char *)value_cond_desc->value;
-    right_inclusive = true;
-  }
-    break;
-  case GREAT_EQUAL: {
-    left_key = (const char *)value_cond_desc->value;
-    left_inclusive = true;
-  }
-    break;
-  case LESS_THAN: {
-    right_key = (const char *)value_cond_desc->value;
-    right_inclusive = false;
-  }
-    break;
-  case GREAT_THAN: {
-    left_key = (const char *)value_cond_desc->value;
-    left_inclusive = false;
-  }
-    break;
-  default: {
-    return nullptr;
-  }
+    case EQUAL_TO: {
+      left_key = (const char *)value_cond_desc->value;
+      right_key = (const char *)value_cond_desc->value;
+      left_inclusive = true;
+      right_inclusive = true;
+    } break;
+    case LESS_EQUAL: {
+      right_key = (const char *)value_cond_desc->value;
+      right_inclusive = true;
+    } break;
+    case GREAT_EQUAL: {
+      left_key = (const char *)value_cond_desc->value;
+      left_inclusive = true;
+    } break;
+    case LESS_THAN: {
+      right_key = (const char *)value_cond_desc->value;
+      right_inclusive = false;
+    } break;
+    case GREAT_THAN: {
+      left_key = (const char *)value_cond_desc->value;
+      left_inclusive = false;
+    } break;
+    default: {
+      return nullptr;
+    }
   }
   return index->create_scanner(left_key, left_inclusive, right_key, right_inclusive);
 }
@@ -845,4 +840,42 @@ RC Table::sync()
   }
   LOG_INFO("Sync table over. table=%s", name());
   return rc;
+}
+RC Table::destroy(const char *dir)
+{
+  RC rc = sync();  // 刷新所有脏页
+
+  if (rc != RC::SUCCESS)
+    return rc;
+
+  std::string path = table_meta_file(dir, name());
+  if (unlink(path.c_str()) != 0) {
+    LOG_ERROR("Failed to remove meta file=%s, errno=%d", path.c_str(), errno);
+    return RC::GENERIC_ERROR;
+  }
+
+  std::string data_file = std::string(dir) + "/" + name() + TABLE_DATA_SUFFIX;
+  if (unlink(data_file.c_str()) != 0) {  // 删除描述表元数据的文件
+    LOG_ERROR("Failed to remove data file=%s, errno=%d", data_file.c_str(), errno);
+    return RC::GENERIC_ERROR;
+  }
+
+//  std::string text_data_file = std::string(dir) + "/" + name() + TABLE_TEXT_DATA_SUFFIX;
+//  if (unlink(text_data_file.c_str()) !=
+//      0) {  // 删除表实现text字段的数据文件（后续实现了text case时需要考虑，最开始可以不考虑这个逻辑）
+//    LOG_ERROR("Failed to remove text data file=%s, errno=%d", text_data_file.c_str(), errno);
+//    return RC::GENERIC_ERROR;
+//  }
+
+//  const int index_num = table_meta_.index_num();
+//  for (int i = 0; i < index_num; i++) {  // 清理所有的索引相关文件数据与索引元数据
+//    ((BplusTreeIndex *)indexes_[i])->close();
+//    const IndexMeta *index_meta = table_meta_.index(i);
+//    std::string index_file = index_data_file(dir, name(), index_meta->name());
+//    if (unlink(index_file.c_str()) != 0) {
+//      LOG_ERROR("Failed to remove index file=%s, errno=%d", index_file.c_str(), errno);
+//      return RC::GENERIC_ERROR;
+//    }
+//  }
+  return RC::SUCCESS;
 }
